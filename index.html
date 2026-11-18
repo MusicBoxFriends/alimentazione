@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Registro Pasti Settimanale</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥗</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --paper: #F3F6F1;
+  --surface: #FFFFFF;
+  --ink: #1B2A20;
+  --muted: #5A6A5F;
+  --line: #D3DCD2;
+  --basil: #2E6B45;
+  --basil-ink: #FFFFFF;
+  --yolk: #D8921A;
+  --danger: #B3402A;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #141A16;
+    --surface: #1C241F;
+    --ink: #E3EAE2;
+    --muted: #9AAA9E;
+    --line: #34413A;
+    --basil: #6FBF8A;
+    --basil-ink: #10251A;
+    --yolk: #F0B44A;
+    --danger: #E58A72;
+    color-scheme: dark;
+  }
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1rem/1.55 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+header h1 {
+  font: 800 clamp(2.1rem, 6vw, 3.2rem)/1.02 var(--display);
+  letter-spacing: -0.025em;
+  margin: 0 0 0.5rem;
+}
+header p { margin: 0; color: var(--muted); max-width: 34rem; }
+
+section { margin-top: 3rem; }
+h2 {
+  font: 700 1.35rem/1.2 var(--display);
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+h3 { font: 700 1.05rem/1.3 var(--display); margin: 2rem 0 0.75rem; }
+
+/* Form */
+.grid { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+.grid .wide { grid-column: 1 / -1; }
+@media (max-width: 34rem) { .grid { grid-template-columns: 1fr; } }
+label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; }
+input, select {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  min-height: 2.75rem;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible, .chip:focus-visible {
+  outline: 3px solid var(--yolk);
+  outline-offset: 2px;
+}
+button {
+  font: 600 0.95rem/1 var(--body);
+  border-radius: 999px;
+  border: 1.5px solid var(--basil);
+  background: var(--basil);
+  color: var(--basil-ink);
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+}
+button.secondary { background: transparent; color: var(--basil); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.25rem; }
+.status { font-size: 0.92rem; color: var(--basil); min-height: 1.4em; }
+.status.error { color: var(--danger); }
+.hint { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0 0; }
+
+/* Exclusion chips */
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; max-height: 15rem; overflow-y: auto; padding: 2px; }
+.chip {
+  font: 500 0.88rem/1 var(--body);
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.5rem 0.65rem;
+  min-height: 2.25rem;
+}
+.chip .wd { color: var(--muted); margin-right: 0.3rem; }
+.chip[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+  text-decoration: line-through;
+}
+.chip[aria-pressed="true"] .wd { color: inherit; }
+
+/* Nutrition label: the one loud element */
+.label {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border: 2px solid var(--ink);
+  padding: 0.9rem 1rem 0.75rem;
+  max-width: 26rem;
+}
+.label-title {
+  font: 800 1.9rem/1 var(--display);
+  letter-spacing: -0.02em;
+  margin: 0 0 0.3rem;
+}
+.label-sub { margin: 0; font-size: 0.9rem; color: var(--muted); }
+.label table { width: 100%; border-collapse: collapse; margin-top: 0.6rem; border-top: 10px solid var(--ink); }
+.label th, .label td { padding: 0.4rem 0; text-align: right; border-bottom: 1px solid var(--ink); font-variant-numeric: tabular-nums; }
+.label th:first-child, .label td:first-child { text-align: left; }
+.label thead th { font-size: 0.8rem; font-weight: 600; color: var(--muted); border-bottom: 3px solid var(--ink); }
+.label tr.energy td { font: 800 1.6rem/1.1 var(--display); border-bottom: 5px solid var(--ink); padding: 0.55rem 0; }
+.label tr.energy td .unit { font: 500 0.95rem var(--body); margin-left: 0.2rem; }
+.label td.gkg { width: 5.5rem; color: var(--muted); }
+.label tr:last-child td { border-bottom: 0; }
+
+.range { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 26rem; }
+
+.chart-box { position: relative; height: 16rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem; }
+
+details { margin-top: 2rem; border-top: 1px solid var(--line); padding-top: 0.75rem; }
+summary { cursor: pointer; font-weight: 600; padding: 0.4rem 0; }
+.table-wrap { overflow-x: auto; margin-top: 0.75rem; }
+.meals { width: 100%; border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+.meals th, .meals td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.meals th { font-weight: 600; color: var(--muted); }
+.meals td.num, .meals th.num { text-align: right; }
+.meals button { padding: 0.35rem 0.7rem; font-size: 0.82rem; border-color: var(--danger); color: var(--danger); background: transparent; }
+
+.empty { color: var(--muted); padding: 1rem 0; }
+.notice { border-left: 3px solid var(--danger); padding: 0.6rem 0.9rem; background: var(--surface); margin-top: 1rem; }
+.notice p { margin: 0 0 0.6rem; }
+input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🥗 Registro Pasti Settimanale</h1>
+    <p>I pasti vengono salvati in questo browser. Usa “Esporta” per farne una copia o per spostarli su un altro dispositivo.</p>
+  </header>
+
+  <section aria-labelledby="h-registra">
+    <h2 id="h-registra">Registra un pasto</h2>
+    <div id="db-error" class="notice" hidden>
+      <p id="db-error-msg"></p>
+      <button type="button" class="secondary" id="db-pick">Carica il tuo file .ods</button>
+    </div>
+    <form id="form-pasto" class="grid">
+      <div>
+        <label for="tipo">Tipo di pasto</label>
+        <select id="tipo">
+          <option>Colazione</option><option>Pranzo</option><option>Cena</option><option>Spuntino</option>
+        </select>
+      </div>
+      <div>
+        <label for="data-pasto">Data del pasto</label>
+        <input type="date" id="data-pasto" required>
+      </div>
+      <div class="wide">
+        <label for="cibo">Scegli un alimento</label>
+        <select id="cibo" required disabled><option>Caricamento alimenti…</option></select>
+      </div>
+      <div>
+        <label for="peso-g">Quantità (g)</label>
+        <input type="number" id="peso-g" min="1" max="2000" step="1" value="100" required inputmode="numeric">
+      </div>
+      <div class="wide actions" style="margin-top:0">
+        <button type="submit" id="btn-registra" disabled>Registra pasto</button>
+        <span class="status" id="status-pasto" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </section>
+
+  <section aria-labelledby="h-escludi">
+    <h2 id="h-escludi">📆 Giorni da escludere dalle statistiche</h2>
+    <div id="chips" class="chips" role="group" aria-label="Seleziona i giorni da escludere"></div>
+    <div class="actions">
+      <button type="button" id="btn-esclusioni">Salva esclusioni</button>
+      <span class="status" id="status-escl" role="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-stats">
+    <h2 id="h-stats">📊 Statistiche</h2>
+    <div id="stats-empty" class="empty">Nessun pasto registrato.</div>
+    <div id="stats" hidden>
+      <div class="range">
+        <div><label for="dal">Dal</label><input type="date" id="dal"></div>
+        <div><label for="al">Al</label><input type="date" id="al"></div>
+      </div>
+      <div id="stats-none" class="empty" hidden>Nessun pasto nel periodo selezionato.</div>
+      <div id="stats-body">
+        <div class="label">
+          <p class="label-title">Medie sul periodo</p>
+          <p class="label-sub" id="label-sub"></p>
+          <table>
+            <thead><tr><th scope="col">Valore</th><th scope="col">Al giorno</th><th scope="col">g/kg</th></tr></thead>
+            <tbody id="label-rows"></tbody>
+          </table>
+        </div>
+
+        <h3>Kcal giornaliere</h3>
+        <div class="chart-box"><canvas id="chart" aria-label="Grafico delle kcal giornaliere" role="img"></canvas></div>
+
+        <details>
+          <summary>Visualizza pasti registrati</summary>
+          <div class="table-wrap">
+            <table class="meals">
+              <thead><tr><th>Data</th><th>Pasto</th><th>Alimento</th><th class="num">Quantità (g)</th><th class="num">Kcal</th><th><span class="sr" hidden>Azioni</span></th></tr></thead>
+              <tbody id="meal-rows"></tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-dati">
+    <h2 id="h-dati">Dati e impostazioni</h2>
+    <div class="grid">
+      <div>
+        <label for="peso-kg">Peso corporeo (kg)</label>
+        <input type="number" id="peso-kg" min="20" max="300" step="0.1" inputmode="decimal">
+        <p class="hint">Usato per le medie in g/kg.</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="secondary" id="btn-export">Esporta new_pasti.json</button>
+      <button type="button" class="secondary" id="btn-import">Importa new_pasti.json</button>
+      <input type="file" id="import-file" accept=".json,application/json">
+      <span class="status" id="status-dati" role="status" aria-live="polite"></span>
+    </div>
+
+    <h3>Elenco alimenti</h3>
+    <p id="db-source">Caricamento…</p>
+    <p class="hint">Puoi usare un tuo file .ods: resta salvato in questo browser finché non lo cambi. Deve avere i nomi degli alimenti nella prima colonna e gli stessi titoli di colonna di cibi.ods (Calorie /100g, Grassi Tot /100g, Grassi Sat /100g, Proteine /100g, Carbs /100g, Zuccheri /100g).</p>
+    <div class="actions">
+      <button type="button" class="secondary" id="btn-db-upload">Carica il tuo file .ods</button>
+      <button type="button" class="secondary" id="btn-db-reset" hidden>Usa l’elenco del sito</button>
+      <span class="status" id="status-db" role="status" aria-live="polite"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const KEY_PASTI = "new_pasti";
+  const KEY_PESO = "peso_kg";
+  const KEY_DB = "cibi_personali";
+  const DB_PATH = "cibi.ods";
+  const COLS = {
+    "Calorie /100g": "kcal",
+    "Grassi Tot /100g": "grassi tot",
+    "Grassi Sat /100g": "grassi sat",
+    "Proteine /100g": "proteine",
+    "Carbs /100g": "carboidrati",
+    "Zuccheri /100g": "zuccheri"
+  };
+  const NUM_FIELDS = ["kcal", "carboidrati", "zuccheri", "proteine", "grassi tot", "grassi sat"];
+
+  const $ = id => document.getElementById(id);
+  const fmt = (n, d = 1) => Number(n).toLocaleString("it-IT", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const round1 = n => Math.round(n * 10) / 10;
+
+  function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function addDays(iso, n) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const dt = new Date(y, m - 1, d + n);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  }
+  function weekday(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("it-IT", { weekday: "short" });
+  }
+  function shortDate(iso) {
+    const [y, m, d] = iso.split("-");
+    return `${d}/${m}/${y.slice(2)}`;
+  }
+  function flash(el, msg, isError = false) {
+    el.textContent = msg;
+    el.classList.toggle("error", isError);
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.textContent = ""; }, 4000);
+  }
+
+  // === Storage (replaces new_pasti.json) ===
+  function caricaPasti() {
+    try {
+      const raw = localStorage.getItem(KEY_PASTI);
+      const pasti = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(pasti)) return [];
+      for (const p of pasti) if (!("escluso" in p)) p.escluso = false;
+      return pasti;
+    } catch { return []; }
+  }
+  function aggiornaPasti(pasti) {
+    try {
+      localStorage.setItem(KEY_PASTI, JSON.stringify(pasti));
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }
+  function caricaPeso() {
+    try {
+      const v = parseFloat(localStorage.getItem(KEY_PESO));
+      return Number.isFinite(v) && v > 0 ? v : 60.8;
+    } catch { return 60.8; }
+  }
+
+  // === Food database (reads cibi.ods like pandas did) ===
+  function parseDatabase(arrayBuffer) {
+    const wb = XLSX.read(arrayBuffer, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+    if (!rows.length) return [];
+    const header = rows[0].map(h => (h == null ? "" : String(h).trim()));
+    const idx = {};
+    header.forEach((h, i) => { if (COLS[h]) idx[COLS[h]] = i; });
+    const missing = NUM_FIELDS.filter(f => idx[f] === undefined);
+    if (missing.length) throw new Error("Colonne mancanti nel foglio: " + missing.join(", "));
+
+    const toNum = v => {
+      if (v == null || v === "") return NaN;
+      if (typeof v === "number") return v;
+      return parseFloat(String(v).replace(",", "."));
+    };
+    const cibi = [];
+    for (const r of rows.slice(1)) {
+      const nome = r[0];
+      if (nome == null || String(nome) === "") continue;
+      const cibo = { nome: String(nome) };
+      let ok = true;
+      for (const f of NUM_FIELDS) {
+        const n = toNum(r[idx[f]]);
+        if (!Number.isFinite(n)) { ok = false; break; }
+        cibo[f] = n;
+      }
+      if (ok) cibi.push(cibo);
+    }
+    return cibi;
+  }
+
+  let datiCibi = new Map();
+
+  function setDatabase(cibi, fonte) {
+    const precedente = $("cibo").value;
+    datiCibi = new Map(cibi.map(c => [c.nome, c]));
+    const sel = $("cibo");
+    sel.innerHTML = "";
+    for (const nome of datiCibi.keys()) {
+      const o = document.createElement("option");
+      o.value = nome; o.textContent = nome;
+      sel.appendChild(o);
+    }
+    if (datiCibi.has(precedente)) sel.value = precedente;
+    sel.disabled = datiCibi.size === 0;
+    $("btn-registra").disabled = datiCibi.size === 0;
+    $("db-error").hidden = true;
+
+    const n = `${datiCibi.size} ${datiCibi.size === 1 ? "alimento" : "alimenti"}`;
+    $("db-source").textContent = fonte.tipo === "personale"
+      ? `In uso: il tuo file “${fonte.nome}”, caricato il ${shortDate(fonte.data)} (${n}).`
+      : `In uso: cibi.ods del sito (${n}).`;
+    $("btn-db-reset").hidden = fonte.tipo !== "personale";
+  }
+
+  function caricaPersonale() {
+    try {
+      const raw = localStorage.getItem(KEY_DB);
+      if (!raw) return null;
+      const db = JSON.parse(raw);
+      return db && Array.isArray(db.cibi) && db.cibi.length ? db : null;
+    } catch { return null; }
+  }
+
+  async function caricaDatabaseCibi() {
+    const personale = caricaPersonale();
+    if (personale) {
+      setDatabase(personale.cibi, { tipo: "personale", nome: personale.nome, data: personale.data });
+      return;
+    }
+    try {
+      const res = await fetch(DB_PATH, { cache: "no-cache" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const cibi = parseDatabase(await res.arrayBuffer());
+      if (!cibi.length) throw new Error("il file non contiene alimenti completi");
+      setDatabase(cibi, { tipo: "sito" });
+    } catch (e) {
+      console.error(e);
+      datiCibi = new Map();
+      $("cibo").innerHTML = "<option>Nessun alimento caricato</option>";
+      $("cibo").disabled = true;
+      $("btn-registra").disabled = true;
+      $("btn-db-reset").hidden = true;
+      $("db-source").textContent = "Nessun elenco alimenti caricato.";
+      $("db-error-msg").textContent = location.protocol === "file:"
+        ? "Il browser non permette di leggere cibi.ods da una pagina aperta come file. Pubblica il sito (o avvia un server locale), oppure carica qui il tuo file."
+        : "Questo sito non ha un elenco alimenti utilizzabile. Carica il tuo file .ods per iniziare.";
+      $("db-error").hidden = false;
+    }
+  }
+
+  // One hidden file input serves both upload buttons
+  const dbInput = document.createElement("input");
+  dbInput.type = "file";
+  dbInput.accept = ".ods,.xlsx,.xls";
+  document.body.appendChild(dbInput);
+  dbInput.style.display = "none";
+
+  dbInput.addEventListener("change", async () => {
+    const file = dbInput.files[0];
+    dbInput.value = "";
+    if (!file) return;
+    const status = $("status-db");
+    try {
+      const cibi = parseDatabase(await file.arrayBuffer());
+      if (!cibi.length) throw new Error("nessuna riga con tutti i valori compilati");
+      const db = { nome: file.name, data: todayISO(), cibi };
+      try { localStorage.setItem(KEY_DB, JSON.stringify(db)); }
+      catch { throw new Error("spazio del browser insufficiente"); }
+      setDatabase(cibi, { tipo: "personale", nome: db.nome, data: db.data });
+      flash(status, `Elenco caricato: ${cibi.length} alimenti.`);
+      flash($("status-pasto"), `Ora usi il tuo elenco (${cibi.length} alimenti).`);
+    } catch (err) {
+      const msg = "File non valido: " + err.message;
+      flash(status, msg, true);
+      if (!$("db-error").hidden) $("db-error-msg").textContent = msg;
+    }
+  });
+
+  $("db-pick").addEventListener("click", () => dbInput.click());
+  $("btn-db-upload").addEventListener("click", () => dbInput.click());
+  $("btn-db-reset").addEventListener("click", async () => {
+    try { localStorage.removeItem(KEY_DB); } catch {}
+    await caricaDatabaseCibi();
+    if (datiCibi.size) flash($("status-db"), "Ora usi l’elenco del sito.");
+  });
+
+  // === Register a meal ===
+  $("data-pasto").value = todayISO();
+
+  $("form-pasto").addEventListener("submit", e => {
+    e.preventDefault();
+    const status = $("status-pasto");
+    const info = datiCibi.get($("cibo").value);
+    const peso = Number($("peso-g").value);
+    const data = $("data-pasto").value;
+    if (!info) return flash(status, "Scegli un alimento dall’elenco.", true);
+    if (!Number.isFinite(peso) || peso < 1 || peso > 2000) return flash(status, "La quantità deve essere tra 1 e 2000 g.", true);
+    if (!data) return flash(status, "Indica la data del pasto.", true);
+
+    const alimento = { nome: info.nome, "quantità": peso };
+    for (const f of ["kcal", "carboidrati", "proteine", "grassi tot", "grassi sat", "zuccheri"]) {
+      alimento[f] = round1(info[f] * peso / 100);
+    }
+    const pasti = caricaPasti();
+    pasti.push({ data, pasto: $("tipo").value, alimenti: [alimento], escluso: false });
+    if (!aggiornaPasti(pasti)) return flash(status, "Salvataggio non riuscito: lo spazio del browser è pieno o bloccato.", true);
+    flash(status, "Pasto registrato correttamente!");
+    renderAll();
+  });
+
+  // === Excluded days ===
+  let selezioneEscluse = new Set();
+
+  function dateList(pasti) {
+    const list = [...new Set(pasti.map(p => p.data))].sort();
+    if (list.length) {
+      const oggi = todayISO();
+      let d = list[list.length - 1];
+      while (d < oggi) { d = addDays(d, 1); list.push(d); }
+    }
+    return [...new Set(list)].sort();
+  }
+
+  function renderChips(pasti) {
+    const box = $("chips");
+    box.innerHTML = "";
+    const dates = dateList(pasti);
+    if (!dates.length) {
+      box.innerHTML = '<p class="empty">Registra un pasto per poter escludere dei giorni.</p>';
+      $("btn-esclusioni").disabled = true;
+      return;
+    }
+    $("btn-esclusioni").disabled = false;
+    for (const d of dates.slice().reverse()) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.setAttribute("aria-pressed", selezioneEscluse.has(d) ? "true" : "false");
+      b.innerHTML = `<span class="wd">${weekday(d)}</span>${shortDate(d)}`;
+      b.addEventListener("click", () => {
+        if (selezioneEscluse.has(d)) selezioneEscluse.delete(d); else selezioneEscluse.add(d);
+        b.setAttribute("aria-pressed", selezioneEscluse.has(d) ? "true" : "false");
+      });
+      box.appendChild(b);
+    }
+  }
+
+  $("btn-esclusioni").addEventListener("click", () => {
+    const pasti = caricaPasti();
+    for (const p of pasti) p.escluso = selezioneEscluse.has(p.data);
+    if (!aggiornaPasti(pasti)) return flash($("status-escl"), "Salvataggio non riuscito.", true);
+    flash($("status-escl"), "Esclusioni salvate correttamente!");
+    renderAll();
+  });
+
+  // === Statistics ===
+  let chart = null;
+  let rangeTouched = false;
+  $("dal").addEventListener("change", () => { rangeTouched = true; renderStats(caricaPasti()); });
+  $("al").addEventListener("change", () => { rangeTouched = true; renderStats(caricaPasti()); });
+
+  function renderStats(pasti) {
+    if (!pasti.length) {
+      $("stats-empty").textContent = "Nessun pasto registrato.";
+      $("stats-empty").hidden = false; $("stats").hidden = true;
+      return;
+    }
+    // Flatten (like pd.json_normalize with record_path="alimenti")
+    const rows = [];
+    pasti.forEach((p, mi) => {
+      if (p.escluso) return;
+      (p.alimenti || []).forEach((a, ai) => rows.push({ ...a, data: p.data, pasto: p.pasto, _mi: mi, _ai: ai }));
+    });
+    if (!rows.length) {
+      $("stats-empty").textContent = "Tutti i giorni registrati sono esclusi dalle statistiche.";
+      $("stats-empty").hidden = false; $("stats").hidden = true;
+      return;
+    }
+    $("stats-empty").hidden = true; $("stats").hidden = false;
+
+    const allDates = rows.map(r => r.data).sort();
+    if (!rangeTouched || !$("dal").value || !$("al").value) {
+      $("dal").value = allDates[0];
+      $("al").value = allDates[allDates.length - 1];
+    }
+    const dal = $("dal").value, al = $("al").value;
+    const filtrato = rows.filter(r => r.data >= dal && r.data <= al);
+
+    if (!filtrato.length) {
+      $("stats-none").hidden = false; $("stats-body").hidden = true;
+      return;
+    }
+    $("stats-none").hidden = true; $("stats-body").hidden = false;
+
+    const nGiorni = new Set(filtrato.map(r => r.data)).size;
+    const pesoKg = caricaPeso();
+    const sum = f => round1(filtrato.reduce((s, r) => s + (Number(r[f]) || 0), 0));
+
+    $("label-sub").textContent = `Su ${nGiorni} ${nGiorni === 1 ? "giorno" : "giorni"}, peso ${fmt(pesoKg, 1)} kg`;
+    const kcal = sum("kcal") / nGiorni;
+    const macro = [["Carboidrati", "carboidrati"], ["Proteine", "proteine"], ["Grassi totali", "grassi tot"]];
+    let html = `<tr class="energy"><td>Energia</td><td>${fmt(kcal, 0)}<span class="unit">kcal</span></td><td class="gkg"></td></tr>`;
+    for (const [lbl, f] of macro) {
+      const perDay = sum(f) / nGiorni;
+      html += `<tr><td>${lbl}</td><td>${fmt(perDay, 1)} g</td><td class="gkg">${fmt(perDay / pesoKg, 2)}</td></tr>`;
+    }
+    $("label-rows").innerHTML = html;
+
+    // Daily kcal chart
+    const perGiorno = new Map();
+    for (const r of filtrato) perGiorno.set(r.data, (perGiorno.get(r.data) || 0) + (Number(r.kcal) || 0));
+    const giorni = [...perGiorno.keys()].sort();
+    drawChart(giorni, giorni.map(g => round1(perGiorno.get(g))));
+
+    // Meals table
+    const tbody = $("meal-rows");
+    tbody.innerHTML = "";
+    for (const r of filtrato) {
+      const tr = document.createElement("tr");
+      const cells = [shortDate(r.data), r.pasto, r.nome];
+      cells.forEach(c => { const td = document.createElement("td"); td.textContent = c; tr.appendChild(td); });
+      const q = document.createElement("td"); q.className = "num"; q.textContent = fmt(r["quantità"], 0); tr.appendChild(q);
+      const k = document.createElement("td"); k.className = "num"; k.textContent = fmt(r.kcal, 1); tr.appendChild(k);
+      const act = document.createElement("td");
+      const del = document.createElement("button");
+      del.type = "button"; del.textContent = "Elimina";
+      del.setAttribute("aria-label", `Elimina ${r.nome} del ${shortDate(r.data)}`);
+      del.addEventListener("click", () => eliminaAlimento(r._mi, r._ai, r.nome));
+      act.appendChild(del); tr.appendChild(act);
+      tbody.appendChild(tr);
+    }
+  }
+
+  function eliminaAlimento(mi, ai, nome) {
+    if (!confirm(`Eliminare “${nome}” da questo pasto?`)) return;
+    const pasti = caricaPasti();
+    const p = pasti[mi];
+    if (!p) return;
+    p.alimenti.splice(ai, 1);
+    if (!p.alimenti.length) pasti.splice(mi, 1);
+    aggiornaPasti(pasti);
+    renderAll();
+  }
+
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function drawChart(labels, values) {
+    const ink = cssVar("--ink"), muted = cssVar("--muted"), line = cssVar("--line"), yolk = cssVar("--yolk");
+    if (chart) chart.destroy();
+    chart = new Chart($("chart"), {
+      type: "line",
+      data: {
+        labels: labels.map(shortDate),
+        datasets: [{
+          label: "kcal",
+          data: values,
+          borderColor: yolk,
+          backgroundColor: yolk,
+          borderWidth: 2.5,
+          pointRadius: labels.length > 40 ? 0 : 3,
+          tension: 0.25
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => `${fmt(c.parsed.y, 0)} kcal` } }
+        },
+        scales: {
+          x: { ticks: { color: muted, maxRotation: 0, autoSkip: true }, grid: { display: false }, border: { color: line } },
+          y: { ticks: { color: muted }, grid: { color: line }, border: { display: false } }
+        }
+      }
+    });
+    Chart.defaults.color = ink;
+  }
+
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderStats(caricaPasti()));
+
+  // === Data & settings ===
+  $("peso-kg").value = caricaPeso();
+  $("peso-kg").addEventListener("change", e => {
+    const v = parseFloat(e.target.value);
+    if (!Number.isFinite(v) || v <= 0) { e.target.value = caricaPeso(); return; }
+    try { localStorage.setItem(KEY_PESO, String(v)); } catch {}
+    renderStats(caricaPasti());
+  });
+
+  $("btn-export").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(caricaPasti(), null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "new_pasti.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  $("btn-import").addEventListener("click", () => $("import-file").click());
+  $("import-file").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const status = $("status-dati");
+    try {
+      const data = JSON.parse(await file.text());
+      if (!Array.isArray(data) || !data.every(p => p && typeof p.data === "string" && Array.isArray(p.alimenti))) {
+        throw new Error("il file non ha il formato di new_pasti.json");
+      }
+      const attuali = caricaPasti().length;
+      if (attuali && !confirm(`Sostituire i ${attuali} pasti salvati con i ${data.length} del file?`)) return;
+      for (const p of data) if (!("escluso" in p)) p.escluso = false;
+      if (!aggiornaPasti(data)) throw new Error("spazio del browser insufficiente");
+      rangeTouched = false;
+      flash(status, `Importati ${data.length} pasti.`);
+      renderAll();
+    } catch (err) {
+      flash(status, "Importazione non riuscita: " + err.message, true);
+    }
+  });
+
+  // === Render ===
+  function renderAll() {
+    const pasti = caricaPasti();
+    selezioneEscluse = new Set(pasti.filter(p => p.escluso).map(p => p.data));
+    renderChips(pasti);
+    renderStats(pasti);
+  }
+
+  renderAll();
+  caricaDatabaseCibi();
+})();
+</script>
+</body>
+</html>
